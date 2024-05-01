@@ -1,0 +1,206 @@
+openapi: 3.0.0
+info:
+  title: Maze API
+  description: Navigate through the maze to find the code without hitting the walls
+  version: '0.1'
+  contact:
+    name: PyRuby LTD
+    url: 'https://www.pyruby.com'
+servers:
+  - url: 'http://localhost:8080'
+    description: Local test server
+  - url: 'https://api-dev.pyruby.co.uk/'
+    description: Dev environment server
+paths:
+  /maze:
+    get:
+      summary: Returns a list of mazes for current user
+      description: 'Contains all the practice mazes created to test your client. It will only contain at most 1 assessment maze.'
+      security:
+        - api_key: []
+      responses:
+        '200':
+          description: A result object containing an array of practice mazes and the assessment maze if created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/maze_result'
+    post:
+      summary: Add a new maze
+      description: By default this will add a new practice maze. You only get one shot at the assesment maze, so don't create that too early
+      parameters:
+        - name: assessment
+          in: query
+          description: When the assessment parameter is set to true, the assessment maze is created, otherwise a practice maze is created
+          required: false
+          schema:
+            type: boolean
+      security:
+        - api_key: []
+      responses:
+        '201':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/maze'
+        '400':
+          description: Attempted to create more than 5 practice mazes, or more than 1 assessment maze
+          content:
+            application/json:
+              example: '{"error": "You have reached the maximum 10 practice mazes"}'
+  '/maze/{id}':
+    get:
+      summary: Returns an individual maze
+      security:
+        - api_key: []
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/maze'
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/identifier'
+  '/maze/{id}/{x}/{y}':
+    post:
+      summary: From the starting cell, move to a new cell in the maze
+      operationId: app.api.maze.move_cell
+      security:
+        - api_key: []
+      responses:
+        '200':
+          description: The cell moved to
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/cell'
+        '400':
+          description: Cannot move in that direction. This will increment the collision counter on the maze
+          content:
+            application/json:
+              example: '{"error": "Cannot move in that direction"}'
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/identifier'
+      - name: x
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: y
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - name: move
+        in: query
+        schema:
+          type: string
+          enum: ['north', 'east', 'south', 'west']
+  '/maze/{id}/solution':
+    post:
+      summary: Submit the code found when navigating the maze
+      operationId: app.api.maze.solve
+      security:
+        - api_key: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/solution'
+      responses:
+        '200':
+          description: Maze solved successfully
+          content:
+            application/json:
+              example: '{"result": "success", "next": "https://api.interview.equalexperts.io/outcomes.html"}'
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/identifier'
+components:
+  schemas:
+    maze:
+      description: the maize
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/identifier'
+        current_cell:
+          $ref: '#/components/schemas/cell'
+        collisions:
+          type: integer
+          format: int32
+        guesses:
+          type: integer
+          format: int32
+        solved:
+          type: boolean
+      required:
+        - id
+        - current_cell
+        - solved
+    identifier:
+      description: API item identifier string (UUID)
+      type: string
+      pattern: '[0-9a-f-]{36}'
+      readOnly: true
+      example: 9a780606-1c88-ada1-91ed-06f989cc3dac
+    maze_result:
+      type: object
+      properties:
+        practice:
+          type: array
+          items:
+            $ref: '#/components/schemas/maze'
+        assessment:
+          $ref: '#/components/schemas/maze'
+    cell:
+      type: object
+      properties:
+        x:
+          type: integer
+          format: int32
+        y:
+          type: integer
+          format: int32
+        secret:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/link'
+    link:
+      type: object
+      properties:
+        rel:
+          type: string
+          enum: ['move:north', 'move:east', 'move:south', 'move:west']
+        href:
+          type: string
+    solution:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
+  securitySchemes:
+    api_key:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      x-apikeyInfoFunc: com.pyruby.maze.api.security.getApiKeyInfo

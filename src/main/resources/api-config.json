@@ -1,0 +1,6 @@
+{
+  "interfaceOnly": false,
+  "openApiNullable": false,
+  "skipDefaultInterface": false,
+  "useSpringBoot3": true
+}
